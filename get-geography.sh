@@ -103,6 +103,7 @@ readonly CACHEFILE=.$(basename $0)-cache
 test -f $CACHEFILE -a -z "$RELOAD" && {
 	cat $CACHEFILE
 } || {
+	rm -f ${CACHEFILE}
 
 	oIFS="$IFS"
 	for u in $URLS
