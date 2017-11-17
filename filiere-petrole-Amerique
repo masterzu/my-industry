@@ -1,0 +1,1 @@
+./find-building-for-petrole.sh |grep Amérique|sort -t\| -k3,3 -k2,2 -k1,1 |column -ts\|
