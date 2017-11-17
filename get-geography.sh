@@ -4,10 +4,12 @@
  
 # Patrick CAO HUU THIEN <patrick.cao_huu_thien@upmc.fr>
 # 
-readonly VERSION=1
+readonly VERSION=2
 # History
 # * 31 oct. 2017 - 1
 # - initial version
+# * 17 nov 17 - 2
+# - add cache file
  
 function usage() {
 cat <<EOT
@@ -126,8 +128,8 @@ test -f $CACHEFILE -a -z "$RELOAD" && {
 			test -n "$ville" -a -n "$climat" -a -n "$ressource" || continue
 			echo "$ville|$pays|$continent|$climat|$ressource" |tee -a $CACHEFILE
 		done
-		IFS=$oIFS
 	done
+	IFS="$oIFS"
 }
 
 
