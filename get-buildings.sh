@@ -98,34 +98,73 @@ test -n "$DEBUG" && URLS="1"
 trap do_trap_user TERM INT
 trap do_trap_exit EXIT
 
-oIFS="$IFS"
-for u in $URLS
-do
-	do_verbose "========================================================================"
-	do_verbose "* URL ${URL_BASE}${u}"
-	do_verbose "========================================================================"
-	do_verbose "ville|loyer|surface|societe"
-	table=$(wget -q -O - ${URL_BASE}${u} | xmllint --html --format --xpath '//table[3]' - 2>/dev/null)
-	IFS=$'\n' ## split line with only \n
-	for line in $table
+readonly CACHEFILE=.$(basename $0)-cache
+readonly UPDATETIME=800000 #format HHMMSS
+
+# get current update of l'Arbitre
+# CURRENTUPDATE format YYMMSSHHMMSS
+test "$(date +%H%M%S)" -le "$UPDATETIME" && {
+	CURRENTUPDATE="$(date +%Y%m%d -d yesterday)${UPDATETIME}"
+} || {
+	CURRENTUPDATE="$(date +%Y%m%d)${UPDATETIME}"
+}
+
+# get date of file + 1 day
+# FILEUPDATE format YYMMSSHHMMSS
+test -f ${CACHEFILE} && {
+	FILEDATE=$(date +%Y%m%d -r ${CACHEFILE})
+	FILETIME=$(date +%H:%M:%S -r ${CACHEFILE})
+} || {
+	FILEDATE=19700101
+	FILETIME=00:00:00
+}
+FILEUPDATE=$(date +%Y%m%d%H%M%S -d "${FILEDATE} ${FILETIME}+1day")
+
+# do_debug "DATE:     $(date +%Y%m%d%H%M%S)"
+# do_debug "FILE:     ${FILEDATE}"
+do_debug "FILE UDP: ${FILEUPDATE}"
+do_debug "UPDATE:   ${CURRENTUPDATE}"
+
+test ${FILEUPDATE} -le ${CURRENTUPDATE} && {
+	do_debug "Do an update"
+	DO_UPDATE=1
+} || {
+	do_debug "No update needed"
+}
+
+test -z "${DO_UPDATE}" && {
+	cat ${CACHEFILE}
+} || {
+
+	oIFS="$IFS"
+	for u in $URLS
 	do
-		# do_debug line "[[$line]]"
-		test -n "$line" || continue
-		ville=$(echo "$line" | xmllint --html --xpath 'string(//td[2]/a/text())' - 2>/dev/null)
-		ville2=$(echo "$line" | xmllint --html --xpath 'string(//td[2]/text())' - 2>/dev/null)
-		pays=$(echo $ville2|sed -n 's/^.*(\(.*\) -.*)$/\1/p')
-		continent=$(echo $ville2|sed -n 's/^.*(.*- \(.*\))$/\1/p')
-		# remove space in numbers
-		loyer=$(echo "$line" | xmllint --html --xpath 'string(//td[3]/text())' - 2>/dev/null | sed 's@\([0-9]*\) *\([0-9]*\)@\1\2@g')
-		surface=$(echo "$line" | xmllint --html --xpath 'string(//td[4]/text())' - 2>/dev/null | sed 's@\([0-9]*\) *\([0-9]*\)@\1\2@g')
-		societe=$(echo "$line" | xmllint --html --xpath 'string(//td[5]/text())' - 2>/dev/null)
+		do_verbose "========================================================================"
+		do_verbose "* URL ${URL_BASE}${u}"
+		do_verbose "========================================================================"
+		do_verbose "ville|loyer|surface|societe"
+		table=$(wget -q -O - ${URL_BASE}${u} | xmllint --html --format --xpath '//table[3]' - 2>/dev/null)
+		IFS=$'\n' ## split line with only \n
+		for line in $table
+		do
+			# do_debug line "[[$line]]"
+			test -n "$line" || continue
+			ville=$(echo "$line" | xmllint --html --xpath 'string(//td[2]/a/text())' - 2>/dev/null)
+			ville2=$(echo "$line" | xmllint --html --xpath 'string(//td[2]/text())' - 2>/dev/null)
+			pays=$(echo $ville2|sed -n 's/^.*(\(.*\) -.*)$/\1/p')
+			continent=$(echo $ville2|sed -n 's/^.*(.*- \(.*\))$/\1/p')
+			# remove space in numbers
+			loyer=$(echo "$line" | xmllint --html --xpath 'string(//td[3]/text())' - 2>/dev/null | sed 's@\([0-9]*\) *\([0-9]*\)@\1\2@g')
+			surface=$(echo "$line" | xmllint --html --xpath 'string(//td[4]/text())' - 2>/dev/null | sed 's@\([0-9]*\) *\([0-9]*\)@\1\2@g')
+			societe=$(echo "$line" | xmllint --html --xpath 'string(//td[5]/text())' - 2>/dev/null)
 
-		test -n "$ville" -a -n "$ville2" -a -n "$loyer" -a -n "$surface" -a -n "$societe" || continue
-		echo "$ville|$pays|$continent|$loyer|$surface|$societe"
+			test -n "$ville" -a -n "$ville2" -a -n "$loyer" -a -n "$surface" -a -n "$societe" || continue
+			echo "$ville|$pays|$continent|$loyer|$surface|$societe" | tee -a ${CACHEFILE}
+		done
+		IFS=$oIFS
 	done
-	IFS=$oIFS
-done
 
+}
 
 # vim:set ts=4 sw=4 sta ai spelllang=en:
 
