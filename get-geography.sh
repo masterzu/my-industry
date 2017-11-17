@@ -11,12 +11,12 @@ readonly VERSION=1
  
 function usage() {
 cat <<EOT
-Usage: $(basename $0) [-hnvVdn] [-p <prout> ] <x> <y>
+Usage: $(basename $0) [-hnvVdn] [-r] 
 
-Make a action <x> with <y>. 
+Print all cities with geography data
 
 Options:
-    -p : do a prout :)
+	-r : force reload (dont use cache file)
 
     -h : print this page
     -V : print version
@@ -74,15 +74,14 @@ function do_trap_exit() { true; }
 ## Arguments ##############################################
 
 OPTIND=1
-while getopts hnvVdq opt ; do
+while getopts hnvVdqr opt ; do
    case "$opt" in
-        p) PROUT="$OPTARG";;
-
         h) usage; exit;;
         v) VERBOSE=1;;
         d) DEBUG=1; VERBOSE=1;;
         q) QUIET=1;;
         n) TEST=1;;
+        r) RELOAD=1;;
         V) echo "$(basename $0) - $VERSION"; exit;;
    esac
 done
@@ -98,32 +97,40 @@ test -n "$DEBUG" && URLS=1
 trap do_trap_user TERM INT
 trap do_trap_exit EXIT
 
-oIFS="$IFS"
-for u in $URLS
-do
-	do_verbose "========================================================================"
-	do_verbose "* URL ${URL_BASE}${u}"
-	do_verbose "========================================================================"
-	table=$(wget -q -O - ${URL_BASE}${u} | xmllint --html --format --xpath '//table[3]' - 2>/dev/null)
-	IFS=$'\n' ## split line with only \n
-	for line in $table
-	do
-		do_debug line "[[$line]]"
-		ville_full=$(echo "$line" | xmllint --html --xpath 'string(//td[1]/text())' - 2>/dev/null)
-		test -n "$ville_full" || continue
-		do_debug "ville full: $ville_full;"
-		ville=$(echo $ville_full|sed -n 's/ (.*)//p')
-		pays=$(echo $ville_full|sed -n 's/^.*(\(.*\) -.*)$/\1/p')
-		continent=$(echo $ville_full|sed -n 's/^.*(.*- \(.*\))$/\1/p')
-		do_debug "ville: $ville; pays: $pays; continent: $continent"
-		climat=$(echo "$line" | xmllint --html --xpath 'string(//td[2]/text())' - 2>/dev/null)
-		ressource=$(echo "$line" | xmllint --html --xpath 'string(//td[3]/text())' - 2>/dev/null)
+readonly CACHEFILE=.$(basename $0)-cache
+test -f $CACHEFILE -a -z "$RELOAD" && {
+	cat $CACHEFILE
+} || {
 
-		test -n "$ville" -a -n "$climat" -a -n "$ressource" || continue
-		echo "$ville|$pays|$continent|$climat|$ressource"
+	oIFS="$IFS"
+	for u in $URLS
+	do
+		do_verbose "========================================================================"
+		do_verbose "* URL ${URL_BASE}${u}"
+		do_verbose "========================================================================"
+		table=$(wget -q -O - ${URL_BASE}${u} | xmllint --html --format --xpath '//table[3]' - 2>/dev/null)
+		IFS=$'\n' ## split line with only \n
+		for line in $table
+		do
+			do_debug line "[[$line]]"
+			ville_full=$(echo "$line" | xmllint --html --xpath 'string(//td[1]/text())' - 2>/dev/null)
+			test -n "$ville_full" || continue
+			do_debug "ville full: $ville_full;"
+			ville=$(echo $ville_full|sed -n 's/ (.*)//p')
+			pays=$(echo $ville_full|sed -n 's/^.*(\(.*\) -.*)$/\1/p')
+			continent=$(echo $ville_full|sed -n 's/^.*(.*- \(.*\))$/\1/p')
+			do_debug "ville: $ville; pays: $pays; continent: $continent"
+			climat=$(echo "$line" | xmllint --html --xpath 'string(//td[2]/text())' - 2>/dev/null)
+			ressource=$(echo "$line" | xmllint --html --xpath 'string(//td[3]/text())' - 2>/dev/null)
+
+			test -n "$ville" -a -n "$climat" -a -n "$ressource" || continue
+			echo "$ville|$pays|$continent|$climat|$ressource" |tee -a $CACHEFILE
+		done
+		IFS=$oIFS
 	done
-	IFS=$oIFS
-done
+}
+
+
 
 
 # vim:set ts=4 sw=4 sta ai spelllang=en:
