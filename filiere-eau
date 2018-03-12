@@ -1,1 +1,5 @@
-./find-building-for-eau.sh |sort -t\| -k3,3 -k2,2 -k1,1 |column -ts\|
+join -t \| -j 1 \
+	<(./find-building-for-eau.sh ) \
+	<(./get-industries.sh |egrep "Usine de valorisation des déchets|Centrale électrique" | awk -F\| '{print $1}') | uniq\
+|sort -t\| -k3,3 -k2,2 -k1,1 |column -ts\|
+
