@@ -141,15 +141,15 @@ test -z "${DO_UPDATE}" && {
 	do
 		do_debug line "[[$line]]"
 		test -n "$line" || continue
-		ville=$(echo "$line" | xmllint --html --xpath 'string(//td[1]/text())' - 2>/dev/null)
-		do_debug "ville: $ville"
+		villeall=$(echo "$line" | xmllint --html --xpath 'string(//td[1]/text())' - 2>/dev/null)
+			ville=$(echo $villeall|sed -n 's/^\(.*\) (.* -.*)$/\1/p')
+			pays=$(echo $villeall|sed -n 's/^.*(\(.*\) -.*)$/\1/p')
+			continent=$(echo $villeall|sed -n 's/^.*(.*- \(.*\))$/\1/p')
 		activite=$(echo "$line" | xmllint --html --xpath 'string(//td[2]/a/text())' - 2>/dev/null)
-		do_debug "activite: $activite"
 		societe=$(echo "$line" | xmllint --html --xpath 'string(//td[3]/a/text())' - 2>/dev/null)
-		do_debug "societe: $societe"
 
 		test -n "$ville" -a -n "$activite" -a -n "$societe" || continue
-		echo "$ville|$activite|$societe" | tee -a ${CACHEFILE}
+		echo "$ville|$pays|$continent|$activite|$societe" | tee -a ${CACHEFILE}
 	done
 	IFS=$oIFS
 }
