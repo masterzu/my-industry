@@ -96,25 +96,63 @@ readonly URL_BASE="http://www.my-industry.net/activiteindus.php?c=0"
 trap do_trap_user TERM INT
 trap do_trap_exit EXIT
 
-table=$(wget -q -O - ${URL_BASE} | xmllint --html --format --xpath '//table[3]' - 2>/dev/null)
-oIFS="$IFS"
-IFS=$'\n' ## split line with only \n
-for line in $table
-do
-	do_debug line "[[$line]]"
-	test -n "$line" || continue
-	ville=$(echo "$line" | xmllint --html --xpath 'string(//td[1]/text())' - 2>/dev/null)
-	do_debug "ville: $ville"
-	activite=$(echo "$line" | xmllint --html --xpath 'string(//td[2]/a/text())' - 2>/dev/null)
-	do_debug "activite: $activite"
-	societe=$(echo "$line" | xmllint --html --xpath 'string(//td[3]/a/text())' - 2>/dev/null)
-	do_debug "societe: $societe"
+readonly CACHEFILE=.$(basename $0)-cache
+readonly UPDATETIME=800000 #format HHMMSS
 
-	test -n "$ville" -a -n "$activite" -a -n "$societe" || continue
-	echo "$ville|$activite|$societe"
-done
-IFS=$oIFS
+# get current update of l'Arbitre
+# CURRENTUPDATE format YYMMSSHHMMSS
+test "$(date +%H%M%S)" -le "$UPDATETIME" && {
+	CURRENTUPDATE="$(date +%Y%m%d -d yesterday)${UPDATETIME}"
+} || {
+	CURRENTUPDATE="$(date +%Y%m%d)${UPDATETIME}"
+}
 
+# get date of file + 1 day
+# FILEUPDATE format YYMMSSHHMMSS
+test -f ${CACHEFILE} && {
+	FILEDATE=$(date +%Y%m%d -r ${CACHEFILE})
+	FILETIME=$(date +%H:%M:%S -r ${CACHEFILE})
+} || {
+	FILEDATE=19700101
+	FILETIME=00:00:00
+}
+FILEUPDATE=$(date +%Y%m%d%H%M%S -d "${FILEDATE} ${FILETIME}+1day")
+
+do_debug "FILE UDP: ${FILEUPDATE}"
+do_debug "UPDATE:   ${CURRENTUPDATE}"
+
+
+test ${FILEUPDATE} -le ${CURRENTUPDATE} && {
+	do_debug "Do an update"
+	DO_UPDATE=1
+} || {
+	do_debug "No update needed"
+}
+
+
+test -z "${DO_UPDATE}" && {
+	cat ${CACHEFILE}
+} || {
+
+	table=$(wget -q -O - ${URL_BASE} | xmllint --html --format --xpath '//table[3]' - 2>/dev/null)
+	oIFS="$IFS"
+	IFS=$'\n' ## split line with only \n
+	for line in $table
+	do
+		do_debug line "[[$line]]"
+		test -n "$line" || continue
+		ville=$(echo "$line" | xmllint --html --xpath 'string(//td[1]/text())' - 2>/dev/null)
+		do_debug "ville: $ville"
+		activite=$(echo "$line" | xmllint --html --xpath 'string(//td[2]/a/text())' - 2>/dev/null)
+		do_debug "activite: $activite"
+		societe=$(echo "$line" | xmllint --html --xpath 'string(//td[3]/a/text())' - 2>/dev/null)
+		do_debug "societe: $societe"
+
+		test -n "$ville" -a -n "$activite" -a -n "$societe" || continue
+		echo "$ville|$activite|$societe" | tee -a ${CACHEFILE}
+	done
+	IFS=$oIFS
+}
 
 # vim:set ts=4 sw=4 sta ai spelllang=en:
 
